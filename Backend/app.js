@@ -8,6 +8,7 @@ import connectDB from "./db/database.js";
 import userRouter from "./routes/userRoute.js";
 import courseRouter from "./routes/courseRoute.js";
 import instructorRouter from "./routes/instructorRoute.js";
+import jobRouter from "./routes/jobRoute.js";
 
 dotenv.config();
 const app = express();
@@ -30,6 +31,7 @@ app.use(
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/courses", courseRouter);
 app.use("/api/v1/instructor", instructorRouter);
+app.use("/api/v1/jobs", jobRouter);
 
 // Start the server
 const PORT = process.env.PORT || 3000;
