@@ -43,6 +43,7 @@ import Header from "./components/JobPage/Header";
 import CourseHeader from "./components/CoursePage/CourseHeader";
 import JobApplyPage from "./components/JobPage/JobApplyPage";
 import RecommendedJobs from "./components/JobPage/RecommendedJobs";
+import JobList from "./components/Jobposting/JobList.jsx";
 import JobHeader from "./components/Jobposting/JobHeader";
 import JobPostingForm from "./components/Jobposting/JobPostingForm";
 import VideoCallHeader from "./components/Videocall/VideoCallHeader";
@@ -71,6 +72,7 @@ import CertificateVerification from "./components/Certificates/CertificateVerifi
 import StudentDashboard from "./components/Dashboard/StudentDashboard.jsx";
 import Sublime from "./components/Sublime text/Sublime.jsx";
 import Courseweb from "./components/MasterUnion/Courseweb.jsx";
+import BeginnerVideos from "./components/scraping/BeginnerVideos.jsx";
 const config = getDefaultConfig({
   appName: 'My RainbowKit App',
   projectId: 'YOUR_PROJECT_ID',
@@ -183,7 +185,18 @@ const App = () => {
           element={
             <div>
               <JobHeader />
+              <JobList/>
               <JobPostingForm />
+           
+             
+            </div>
+          }
+        />
+         <Route
+          path="/kani"
+          element={
+            <div>
+              <BeginnerVideos/>
            
              
             </div>

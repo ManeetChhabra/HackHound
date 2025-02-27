@@ -9,6 +9,8 @@ import userRouter from "./routes/userRoute.js";
 import courseRouter from "./routes/courseRoute.js";
 import instructorRouter from "./routes/instructorRoute.js";
 import jobRouter from "./routes/jobRoute.js";
+import videoRouter from "./routes/videoRoute.js";
+
 
 dotenv.config();
 const app = express();
@@ -32,7 +34,7 @@ app.use("/api/v1/user", userRouter);
 app.use("/api/v1/courses", courseRouter);
 app.use("/api/v1/instructor", instructorRouter);
 app.use("/api/v1/jobs", jobRouter);
-
+app.use("/api/v1/introductory-videos", videoRouter);
 // Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
