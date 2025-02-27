@@ -1,239 +1,486 @@
-import React, { useState } from "react";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { PaperAirplaneIcon, BookOpenIcon } from "@heroicons/react/24/solid";
+import React, { useState, useEffect } from 'react';
 
-const modulesList = [
-  "Data Structures",
-  "Algorithms",
-  "React.js",
-  "Node.js",
-  "Machine Learning",
+// Pre-made modules (10 modules)
+const initialModules = [
+  { title: 'Web Development', active: false, duration: "30 mins" },
+  { title: 'Machine Learning', active: false, duration: "30 mins" },
+  { title: 'Data Structures', active: false, duration: "30 mins" },
+  { title: 'Algorithms', active: false, duration: "30 mins" },
+  { title: 'Databases', active: false, duration: "30 mins" },
+  { title: 'Networking', active: false, duration: "30 mins" },
+  { title: 'Operating Systems', active: false, duration: "30 mins" },
+  { title: 'Cybersecurity', active: false, duration: "30 mins" },
+  { title: 'Cloud Computing', active: false, duration: "30 mins" },
+  { title: 'UI/UX Design', active: false, duration: "30 mins" }
 ];
 
-// Pastel background colors (reused in a cycle)
-const backgroundColors = [
-  "bg-[#FDF2EC]",
-  "bg-[#FEECEC]",
-  "bg-[#FDF2EC]",
-  "bg-[#FEECEC]",
-  "bg-[#FDF2EC]",
-  "bg-[#FEECEC]",
-];
-
-const MockInterview = () => {
-  const [skill, setSkill] = useState("");
-  const [question, setQuestion] = useState("");
-  const [options, setOptions] = useState([]);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [feedback, setFeedback] = useState("");
+const Mockinterview = () => {
+  const [moduleName, setModuleName] = useState('');
+  const [difficulty, setDifficulty] = useState('Easy');
+  const [questions, setQuestions] = useState([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState('');
+  const [answerSubmitted, setAnswerSubmitted] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [testStarted, setTestStarted] = useState(false);
+  const [error, setError] = useState('');
+  const [modules, setModules] = useState(initialModules);
+  const [showModuleInput, setShowModuleInput] = useState(true);
+  const [timeRemaining, setTimeRemaining] = useState(30);
+  const [timerActive, setTimerActive] = useState(false);
 
-  const API_KEY = "AIzaSyAtV8nuqqKXDNbJ3yahxqGfzWxMBB-RmvU";
-  const genAI = new GoogleGenerativeAI(API_KEY);
-  const getNewQuestion = async () => {
-    if (!skill) return alert("Please select a module first!");
+  // Hardcoded Gemini API key (replace with your actual key)
+  const GEMINI_API_KEY = "AIzaSyCw0xpPJR6XxDv0eN9KXLKZEaEujHEYHzY";
+  
+  // Timer effect
+  useEffect(() => {
+    let timer;
+    if (timerActive && timeRemaining > 0) {
+      timer = setTimeout(() => {
+        setTimeRemaining(timeRemaining - 1);
+      }, 1000);
+    } else if (timeRemaining === 0 && timerActive) {
+      handleNextQuestion();
+    }
+    return () => clearTimeout(timer);
+  }, [timeRemaining, timerActive]);
+
+  const fetchQuestionsFromGemini = async (module) => {
     setLoading(true);
+    setError('');
+    
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-      const prompt = `Generate a multiple-choice interview question for ${skill}. Provide 4 answer options and mark the correct answer. Format: Question, Option1, Option2, Option3, Option4, CorrectOption.`;
-
-      const response = await model.generateContent(prompt);
-      const generatedText =
-        response?.response?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!generatedText) throw new Error("No valid response from AI");
-
-      const lines = generatedText
-        .split("\n")
-        .filter((line) => line.trim() !== "");
-
-      if (lines.length < 6)
-        throw new Error("Unexpected response format from AI");
-
-      setQuestion(lines[0]);
-      setOptions(lines.slice(1, 5));
-      setSelectedAnswer(null);
-      setFeedback("");
-    } catch (error) {
-      console.error("Error fetching question:", error.message);
-      alert("Failed to fetch question. Please try again.");
+      // Include difficulty in the prompt
+      const prompt = `Generate 5 multiple-choice questions about ${module} at ${difficulty} difficulty. 
+Each question should have 4 options with exactly one correct answer. 
+Format the response as a JSON array of objects with the following structure:
+[
+  {
+    "question": "Question text here?",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correctAnswer": "The correct option (exactly matching one of the options)"
+  }
+]`;
+      
+      const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': GEMINI_API_KEY
+        },
+        body: JSON.stringify({
+          contents: [
+            { parts: [{ text: prompt }] }
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1024
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const generatedText = data.candidates[0]?.content?.parts[0]?.text;
+      
+      if (!generatedText) {
+        throw new Error('No content received from API');
+      }
+      
+      // Extract JSON array from response
+      const jsonMatch = generatedText.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        throw new Error('No valid JSON found in response');
+      }
+      
+      const parsedQuestions = JSON.parse(jsonMatch[0]);
+      const questionsWithIds = parsedQuestions.map((q, idx) => ({ ...q, id: idx + 1 }));
+      
+      setQuestions(questionsWithIds);
+      setCurrentQuestionIndex(0);
+      setSelectedAnswer('');
+      setAnswerSubmitted(false);
+      setTimeRemaining(30);
+      setTimerActive(true);
+      
+      // Mark the selected module as active
+      setModules(modules.map(m => ({ ...m, active: m.title === module })));
+      setShowModuleInput(false);
+    } catch (err) {
+      console.error('Error fetching questions:', err);
+      
+      // Fallback questions if API call fails
+      const fallbackQuestions = [
+        {
+          id: 1,
+          question: `What is the main concept of ${module}?`,
+          options: [
+            'Learning through practice',
+            'Memorization techniques',
+            'Visual comprehension',
+            'Auditory learning'
+          ],
+          correctAnswer: 'Learning through practice'
+        },
+        {
+          id: 2,
+          question: `Which of these is NOT a benefit of ${module}?`,
+          options: [
+            'Improved retention',
+            'Faster learning',
+            'Guaranteed job placement',
+            'Better understanding'
+          ],
+          correctAnswer: 'Guaranteed job placement'
+        },
+        {
+          id: 3,
+          question: `Who is considered a key figure in ${module}?`,
+          options: [
+            'Person A',
+            'Person B',
+            'Person C',
+            'Person D'
+          ],
+          correctAnswer: 'Person B'
+        }
+      ];
+      
+      setError('Failed to fetch from Gemini API. Using fallback questions.');
+      setQuestions(fallbackQuestions);
+      setTimeRemaining(30);
+      setTimerActive(true);
+      setModules(modules.map(m => ({ ...m, active: m.title === module })));
+      setShowModuleInput(false);
     } finally {
       setLoading(false);
     }
   };
 
-  const evaluateAnswer = async () => {
-    if (!selectedAnswer) return alert("Please select an answer first!");
-    setLoading(true);
-    try {
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-      const prompt = `The question was: "${question}"\nUser selected: "${selectedAnswer}".\nWas it correct? Provide a brief explanation.`;
-
-      const response = await model.generateContent(prompt);
-      const generatedText =
-        response?.response?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!generatedText) throw new Error("No valid response from AI");
-
-      setFeedback(generatedText);
-    } catch (error) {
-      console.error("Error evaluating answer:", error.message);
-      alert("Failed to evaluate answer. Please try again.");
-    } finally {
-      setLoading(false);
+  const handleModuleSubmit = (e) => {
+    e.preventDefault();
+    if (moduleName.trim()) {
+      fetchQuestionsFromGemini(moduleName);
+    } else {
+      setError('Please enter a module name');
     }
   };
 
-  const startTest = () => {
-    if (!skill) return alert("Please select a module from the side panel!");
-    setTestStarted(true);
-    getNewQuestion();
+  const handleModuleClick = (clickedModule) => {
+    setModuleName(clickedModule.title);
+    fetchQuestionsFromGemini(clickedModule.title);
+  };
+
+  const handleAnswerSelect = (answer) => {
+    if (!answerSubmitted) {
+      setSelectedAnswer(answer);
+    }
+  };
+
+  const handleAnswerSubmit = () => {
+    if (selectedAnswer) {
+      const currentQuestion = questions[currentQuestionIndex];
+      setIsCorrect(selectedAnswer === currentQuestion.correctAnswer);
+      setAnswerSubmitted(true);
+      setTimerActive(false);
+    }
+  };
+
+  const handleNextQuestion = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setSelectedAnswer('');
+      setAnswerSubmitted(false);
+      setTimeRemaining(30);
+      setTimerActive(true);
+    } else {
+      alert('Quiz completed!');
+      setShowModuleInput(true);
+      setTimerActive(false);
+    }
+  };
+
+  const handleAddNewModule = () => {
+    setShowModuleInput(true);
+    setQuestions([]);
+    setTimerActive(false);
   };
 
   return (
-    <div className="min-h-screen mt-24 bg-gradient-to-br from-white to-gray-100">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-orange-500 to-red-500 text-white py-8 px-4 shadow-lg">
-        <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-5xl font-extrabold tracking-wide drop-shadow-lg">
-            AI Mock Interview Module
-          </h1>
-          <p className="mt-3 text-xl">
-            Test your skills with dynamic AI-generated interview questions.
-          </p>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto flex mt-10 space-x-6 px-4">
-        {/* SIDEBAR (Replaced with new design) */}
-        <aside className="w-72 bg-white border border-orange-300 rounded-xl p-6 shadow-xl transform transition-all duration-500 hover:scale-105 text-gray-800">
-          <h2 className="text-xl font-extrabold mb-6 uppercase">PRACTICE QUIZ</h2>
-          <div className="space-y-4">
-            {modulesList.map((mod, index) => (
-              <div
-                key={index}
-                onClick={() => setSkill(mod)}
-                className={`flex items-center justify-between p-4 rounded-md shadow-sm cursor-pointer transition transform duration-300 hover:scale-105 ${
-                  backgroundColors[index % backgroundColors.length]
-                } ${skill === mod ? "ring-2 ring-orange-400" : ""}`}
-              >
-                {/* Left Section: Icon + Module Title */}
-                <div className="flex items-center space-x-2">
-                  <BookOpenIcon className="h-5 w-5 text-gray-600" />
-                  <span className="font-semibold text-gray-700 text-sm">
-                    {mod}
-                  </span>
-                </div>
-                {/* Right Section: (Static) Duration */}
-                <span className="text-sm text-gray-600">30 mins</span>
+    <div className="min-h-screen mt-24 bg-gray-50 py-14 flex flex-col md:flex-row">
+      {/* Sidebar */}
+      <aside className="w-full md:w-1/4 bg-white border-r border-gray-200 p-4">
+        <h2 className="text-lg font-bold text-gray-800 mb-4">PRACTICE QUIZ</h2>
+        <div className="space-y-2">
+          {modules.map((module, index) => (
+            <div
+              key={index}
+              className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition transform duration-300 hover:scale-105 ${
+                module.active
+                  ? "bg-orange-100 border-l-4 border-orange-500"
+                  : "bg-gray-100 hover:bg-gray-200"
+              }`}
+              onClick={() => handleModuleClick(module)}
+            >
+              <div className="flex items-center space-x-2">
+                <span className="text-orange-500">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="w-5 h-5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 6v6m0 0l3-3m-3 3l-3-3m0 12a9 9 0 100-18 9 9 0 000 18z"
+                    />
+                  </svg>
+                </span>
+                <span className="text-sm text-gray-700">{module.title}</span>
               </div>
-            ))}
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 bg-white rounded-xl p-8 shadow-xl">
-          {!testStarted ? (
-            // Instruction Panel
-            <div className="space-y-6 animate-fadeIn">
-              <h2 className="text-3xl font-bold text-orange-500 border-b pb-2">
-                Instructions
-              </h2>
-              <p className="text-gray-700 text-lg">
-                Welcome to the AI Mock Interview Module. Please select a module
-                from the side panel. Once a module is selected, click{" "}
-                <span className="font-bold text-orange-500">Start Test</span> to
-                begin your interview.
-              </p>
-              {skill && (
-                <p className="text-xl text-gray-800">
-                  Selected Module:{" "}
-                  <span className="font-semibold">{skill}</span>
-                </p>
-              )}
-              <button
-                className={`w-full py-3 rounded-lg text-white font-semibold transition-colors duration-300 transform hover:scale-105 ${
-                  skill
-                    ? "bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-                    : "bg-gray-300 cursor-not-allowed"
-                }`}
-                onClick={startTest}
-                disabled={!skill || loading}
-              >
-                Start Test
-              </button>
+              <span className="text-xs text-gray-500">{module.duration}</span>
             </div>
-          ) : (
-            // Interview Panel
-            <div className="space-y-8 animate-fadeIn">
-              <div className="bg-gray-50 border border-orange-300 rounded-xl p-8 shadow-inner transition transform hover:scale-105">
-                <h2 className="text-3xl font-bold text-orange-500 mb-4 border-b pb-2">
-                  Module: {skill}
-                </h2>
-                <div className="mb-6">
-                  <h3 className="text-2xl font-semibold text-gray-800 mb-3">
-                    Question:
-                  </h3>
-                  {loading ? (
-                    <p className="text-gray-500 text-lg animate-pulse">
-                      Loading question...
-                    </p>
-                  ) : (
-                    <p className="text-lg text-gray-700">{question}</p>
-                  )}
-                </div>
-                <div className="space-y-4">
-                  {options.map((option, index) => (
-                    <label
-                      key={index}
-                      className="flex items-center p-4 border border-orange-200 rounded-lg cursor-pointer hover:bg-orange-50 transition-colors duration-300"
-                    >
-                      <input
-                        type="radio"
-                        name="answer"
-                        value={option}
-                        checked={selectedAnswer === option}
-                        onChange={() => setSelectedAnswer(option)}
-                        className="w-5 h-5 text-orange-500 focus:ring-orange-400"
-                      />
-                      <span className="ml-3 text-gray-800">{option}</span>
-                    </label>
-                  ))}
-                </div>
-                <div className="flex space-x-6 mt-8">
-                  <button
-                    className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 rounded-lg text-white font-semibold flex items-center justify-center space-x-2 transition transform hover:scale-105"
-                    onClick={evaluateAnswer}
-                    disabled={loading}
-                  >
-                    <PaperAirplaneIcon className="w-6 h-6" />
-                    <span>Submit Answer</span>
-                  </button>
-                  <button
-                    className="flex-1 py-3 bg-gray-300 hover:bg-gray-200 rounded-lg text-gray-800 font-semibold transition-colors duration-300 transform hover:scale-105"
-                    onClick={getNewQuestion}
-                    disabled={loading}
-                  >
-                    New Question
-                  </button>
-                </div>
-              </div>
+          ))}
+          <div
+            className="flex items-center p-3 rounded-lg cursor-pointer bg-gray-100 hover:bg-gray-200 transition transform duration-300 hover:scale-105"
+            onClick={handleAddNewModule}
+          >
+            <div className="flex items-center space-x-2">
+              <span className="text-blue-500">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-5 h-5"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4.5v15m7.5-7.5h-15"
+                  />
+                </svg>
+              </span>
+              <span className="text-sm text-gray-700">Add New Module</span>
+            </div>
+          </div>
+        </div>
+      </aside>
 
-              {feedback && (
-                <div className="bg-white border border-orange-300 rounded-xl p-8 shadow-xl transition transform hover:scale-105">
-                  <h3 className="text-2xl font-bold text-orange-500 mb-4 border-b pb-2">
-                    AI Feedback
-                  </h3>
-                  <p className="text-gray-800 text-lg">{feedback}</p>
-                </div>
+      {/* Main Content */}
+      <main className="flex-1 bg-orange-50 p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">
+              {showModuleInput ? "Add New Module" : `Module: ${moduleName}`}
+            </h1>
+            <p className="text-sm text-gray-600">
+              {showModuleInput 
+                ? "Enter a new module name and select difficulty to generate questions" 
+                : "Answer all questions to complete the quiz"}
+            </p>
+          </div>
+          {!showModuleInput && (
+            <div className="text-sm text-gray-500 flex items-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-5 h-5 mr-1"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              {timerActive ? (
+                <span className={`font-medium ${timeRemaining < 10 ? 'text-red-500' : ''}`}>
+                  {timeRemaining} seconds remaining
+                </span>
+              ) : (
+                <span>Time: 30 seconds per question</span>
               )}
             </div>
           )}
-        </main>
-      </div>
+        </div>
+
+        {showModuleInput ? (
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">
+              Enter Module Name
+            </h2>
+            <form onSubmit={handleModuleSubmit}>
+              <div className="mb-4">
+                <label htmlFor="moduleName" className="block text-sm font-medium text-gray-700 mb-2">
+                  Module Topic:
+                </label>
+                <input
+                  type="text"
+                  id="moduleName"
+                  value={moduleName}
+                  onChange={(e) => setModuleName(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="e.g. Machine Learning, Quantum Physics, Web Development"
+                />
+              </div>
+              <div className="mb-4">
+                <label htmlFor="difficulty" className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Difficulty:
+                </label>
+                <select
+                  id="difficulty"
+                  value={difficulty}
+                  onChange={(e) => setDifficulty(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="Easy">Easy</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Hard">Hard</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-md transition duration-200"
+                disabled={loading}
+              >
+                {loading ? 'Loading Questions...' : 'Generate Quiz'}
+              </button>
+              {error && <p className="mt-2 text-red-600">{error}</p>}
+            </form>
+          </div>
+        ) : (
+          <>
+            {currentQuestionIndex === 0 && (
+              <div className="bg-white p-4 rounded-lg shadow-md mb-6">
+                <h2 className="text-lg font-bold text-gray-800 mb-2">
+                  Instructions: Please Read Carefully
+                </h2>
+                <ul className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+                  <li>
+                    <span className="font-medium">Answer the Questions:</span>
+                    <ul className="list-disc list-inside ml-4 space-y-1">
+                      <li>Select one of the multiple-choice options for each question.</li>
+                      <li>Click "Submit Answer" when you're ready to check your answer.</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <span className="font-medium">Time Limit:</span>
+                    <ul className="list-disc list-inside ml-4 space-y-1">
+                      <li>You have 30 seconds to answer each question.</li>
+                      <li>If time runs out, you'll automatically move to the next question.</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <span className="font-medium">Results:</span>
+                    <ul className="list-disc list-inside ml-4 space-y-1">
+                      <li>You'll get immediate feedback on whether your answer is correct.</li>
+                      <li>After all questions are completed, you can choose another module or add a new one.</li>
+                    </ul>
+                  </li>
+                </ul>
+              </div>
+            )}
+
+            <div className="bg-white p-4 rounded-lg shadow-md mb-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-2">
+                Question {currentQuestionIndex + 1} of {questions.length}: {questions[currentQuestionIndex]?.question}
+              </h3>
+              
+              <div className="space-y-3 mt-4">
+                {questions[currentQuestionIndex]?.options.map((option, index) => (
+                  <div 
+                    key={index}
+                    onClick={() => handleAnswerSelect(option)}
+                    className={`p-3 border rounded-lg cursor-pointer transition-colors duration-200 ${
+                      selectedAnswer === option 
+                        ? answerSubmitted
+                          ? isCorrect 
+                            ? "bg-green-100 border-green-500" 
+                            : "bg-red-100 border-red-500"
+                          : "bg-orange-100 border-orange-500"
+                        : answerSubmitted && option === questions[currentQuestionIndex].correctAnswer
+                          ? "bg-green-100 border-green-500"
+                          : "hover:bg-gray-100"
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <div className={`w-6 h-6 flex items-center justify-center rounded-full mr-3 ${
+                        selectedAnswer === option ? "bg-orange-500 text-white" : "bg-gray-200"
+                      }`}>
+                        {String.fromCharCode(65 + index)}
+                      </div>
+                      <div className="text-gray-700">{option}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {answerSubmitted && (
+                <div className={`mt-4 p-4 rounded-md ${isCorrect ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
+                  <div className="flex items-start">
+                    <div className="mr-2">
+                      {isCorrect ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium">
+                        {isCorrect ? "Correct!" : "Incorrect!"}
+                      </p>
+                      {!isCorrect && (
+                        <p>
+                          The correct answer is: {questions[currentQuestionIndex].correctAnswer}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-between">
+                {!answerSubmitted ? (
+                  <button
+                    onClick={handleAnswerSubmit}
+                    disabled={!selectedAnswer}
+                    className={`px-4 py-2 rounded-md ${
+                      selectedAnswer 
+                        ? "bg-orange-500 hover:bg-orange-600 text-white" 
+                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    } transition duration-200`}
+                  >
+                    Submit Answer
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleNextQuestion}
+                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md transition duration-200"
+                  >
+                    {currentQuestionIndex < questions.length - 1 ? "Next Question" : "Finish Quiz"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </main>
     </div>
   );
 };
 
-export default MockInterview;
+export default Mockinterview;

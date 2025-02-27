@@ -2,25 +2,35 @@ import React, { useState } from "react";
 
 const JobPostingForm = () => {
   const [formData, setFormData] = useState({
-    workMode: "Work from home",
-    jobTitle: "",
-    companyName: "",
+    title: "",
+    company: "",
     location: "",
     jobType: "",
-    requiredSkills: "",
-    experienceLevel: "",
-    contactDetails: "",
-    salaryRange: "",
-    jobDescription: "",
+    description: "",
+    requirements: "",
+    salary: "",
+    postedBy: "",
   });
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log(formData);
+    try {
+      const response = await fetch("https://your-backend-endpoint.com/api/jobs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+      const result = await response.json();
+      console.log("Success:", result);
+    } catch (error) {
+      console.error("Error:", error);
+    }
   };
 
   return (
@@ -29,31 +39,15 @@ const JobPostingForm = () => {
         {/* Form Section */}
         <div className="w-1/2 p-10">
           <h2 className="text-2xl font-bold text-black mb-4">Job Posting Form</h2>
-          <div className="flex gap-4 mb-6">
-            {['Work from home', 'Offline', 'Hybrid'].map((mode) => (
-              <label key={mode} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="workMode"
-                  value={mode}
-                  checked={formData.workMode === mode}
-                  onChange={handleChange}
-                  className="accent-orange-500"
-                />
-                {mode}
-              </label>
-            ))}
-          </div>
           <form className="space-y-4" onSubmit={handleSubmit}>
             {[
-              { name: "jobTitle", placeholder: "Job Title" },
-              { name: "companyName", placeholder: "Company Name" },
+              { name: "title", placeholder: "Job Title" },
+              { name: "company", placeholder: "Company Name" },
               { name: "location", placeholder: "Location" },
               { name: "jobType", placeholder: "Job Type" },
-              { name: "requiredSkills", placeholder: "Required Skills" },
-              { name: "experienceLevel", placeholder: "Experience Level" },
-              { name: "contactDetails", placeholder: "Contact Details" },
-              { name: "salaryRange", placeholder: "Salary Range" },
+              { name: "requirements", placeholder: "Requirements (comma separated)" },
+              { name: "salary", placeholder: "Salary" },
+              { name: "postedBy", placeholder: "Posted By" },
             ].map((field) => (
               <input
                 key={field.name}
@@ -66,7 +60,7 @@ const JobPostingForm = () => {
             ))}
             
             <textarea
-              name="jobDescription"
+              name="description"
               placeholder="Job Description"
               className="w-full border rounded-md p-3 text-gray-700 h-24"
               onChange={handleChange}
@@ -90,9 +84,7 @@ const JobPostingForm = () => {
               className="object-cover w-full h-full"
             />
             <div className="absolute inset-0 bg-black bg-opacity-20"></div>
-            <div className="absolute text-white text-center p-6">
-             
-            </div>
+            <div className="absolute text-white text-center p-6"></div>
           </div>
         </div>
       </div>
