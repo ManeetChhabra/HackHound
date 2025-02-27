@@ -9,7 +9,7 @@ export const createJob = async (req, res) => {
 
     const { title, company, location, jobType, description, requirements, salary } = req.body;
 
-    if (!title || !company || !location || !jobType || !description || !requirements) {
+    if (!title || !company || !location  || !description ) {
       return res.status(400).json({ message: "All required fields must be provided." });
     }
 
@@ -58,23 +58,35 @@ export const getJobById = async (req, res) => {
 export const applyForJob = async (req, res) => {
   try {
     const { jobId } = req.params;
-    if (!req.user || req.user.role !== "Student") {
-      return res.status(403).json({ message: "Only students can apply for jobs." });
+    const { resume } = req.body; // Resume link or file path
+
+    // ✅ Check if resume is provided
+    if (!resume) {
+      return res.status(400).json({ message: "Resume is required to apply!" });
     }
 
+    // ✅ Find the job by ID
     const job = await Job.findById(jobId);
-    if (!job) return res.status(404).json({ message: "Job not found." });
-
-    if (job.applicants.includes(req.user.id)) {
-      return res.status(400).json({ message: "You have already applied for this job." });
+    if (!job) {
+      return res.status(404).json({ message: "Job not found!" });
     }
 
-    job.applicants.push(req.user.id);
-    await job.save();
+    // ✅ Prevent duplicate applications
+    const alreadyApplied = job.applications.find((app) => app.applicant.toString() === req.user.id);
+    if (alreadyApplied) {
+      return res.status(400).json({ message: "You have already applied for this job!" });
+    }
 
-    return res.status(200).json({ message: "Job application submitted successfully!" });
+    // ✅ Add application to job
+    job.applications.push({
+      applicant: req.user.id,
+      resume,
+    });
+
+    await job.save();
+    res.status(200).json({ message: "Application submitted successfully!" });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to apply for job", error: error.message });
+    res.status(500).json({ message: "Server error!", error: error.message });
   }
 };
 
