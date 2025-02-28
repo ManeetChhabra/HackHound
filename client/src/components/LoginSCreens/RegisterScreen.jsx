@@ -12,6 +12,7 @@ const RegisterScreen = () => {
     skills: [],
   });
   const [skillInput, setSkillInput] = useState("");
+  const [skillLevel, setSkillLevel] = useState("beginner");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -25,35 +26,41 @@ const RegisterScreen = () => {
 
   const handleSkillAdd = () => {
     const trimmedSkill = skillInput.trim();
-    if (trimmedSkill !== "" && !formData.skills.includes(trimmedSkill)) {
-      setFormData({ ...formData, skills: [...formData.skills, trimmedSkill] });
+    if (
+      trimmedSkill !== "" &&
+      !formData.skills.some((skillObj) => skillObj.name === trimmedSkill)
+    ) {
+      setFormData({
+        ...formData,
+        skills: [...formData.skills, { name: trimmedSkill, level: skillLevel }],
+      });
       setSkillInput("");
+      setSkillLevel("beginner");
     }
   };
 
-  const handleSkillRemove = (skill) => {
+  const handleSkillRemove = (indexToRemove) => {
     setFormData({
       ...formData,
-      skills: formData.skills.filter((s) => s !== skill),
+      skills: formData.skills.filter((_, index) => index !== indexToRemove),
     });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await api.post("/api/v1/user/register", formData);
-      setSuccess(response.data.message);
+      await api.post("/api/v1/user/register", formData);
+      setSuccess("Registration attempted."); // Optionally handle success
       setError("");
-      setFormData({ name: "", email: "", password: "", role: "student", skills: [] });
-      
-      // Redirect to /course after successful registration
-      navigate("/courses");
     } catch (error) {
       setError(
         error.response?.data?.message ||
           "An unexpected error occurred. Please try again."
       );
       setSuccess("");
+    } finally {
+      // Redirect to /scraps regardless of success or error
+      navigate("/scraps");
     }
   };
 
@@ -149,7 +156,7 @@ const RegisterScreen = () => {
                     type="text"
                     value={skillInput}
                     onChange={handleSkillChange}
-                    placeholder="Enter a skill and press Add or Enter"
+                    placeholder="Enter a skill"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -158,6 +165,15 @@ const RegisterScreen = () => {
                     }}
                     className="flex-1 px-4 py-2 border border-orange-400 rounded-l-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
                   />
+                  <select
+                    value={skillLevel}
+                    onChange={(e) => setSkillLevel(e.target.value)}
+                    className="px-4 py-2 border-t border-b border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+                  >
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
                   <button
                     type="button"
                     onClick={handleSkillAdd}
@@ -173,11 +189,11 @@ const RegisterScreen = () => {
                       key={index}
                       className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm flex items-center"
                     >
-                      {skill}
+                      {skill.name} ({skill.level})
                       <button
                         type="button"
                         className="ml-2 text-orange-500 hover:text-orange-700"
-                        onClick={() => handleSkillRemove(skill)}
+                        onClick={() => handleSkillRemove(index)}
                       >
                         ✕
                       </button>

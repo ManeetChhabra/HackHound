@@ -193,7 +193,7 @@ const App = () => {
           }
         />
          <Route
-          path="/kani"
+          path="/scraps"
           element={
             <div>
               <BeginnerVideos/>
