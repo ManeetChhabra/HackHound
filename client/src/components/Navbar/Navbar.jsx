@@ -50,6 +50,14 @@ const Navbar = () => {
         </li>
         <li>
           <Link
+            to="/mock-interview"
+            className="cursor-pointer hover:text-orange-400 transition-all duration-300"
+          >
+            Take Test
+          </Link>
+        </li>
+        <li>
+          <Link
             to="/courses"
             className="cursor-pointer hover:text-orange-400 transition-all duration-300"
           >
