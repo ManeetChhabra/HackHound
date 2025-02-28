@@ -28,6 +28,8 @@ const Mockinterview = () => {
   const [showModuleInput, setShowModuleInput] = useState(true);
   const [timeRemaining, setTimeRemaining] = useState(30);
   const [timerActive, setTimerActive] = useState(false);
+  const [score, setScore] = useState(0);
+  const [quizCompleted, setQuizCompleted] = useState(false);
 
   // Hardcoded Gemini API key (replace with your actual key)
   const GEMINI_API_KEY = "AIzaSyCw0xpPJR6XxDv0eN9KXLKZEaEujHEYHzY";
@@ -45,13 +47,32 @@ const Mockinterview = () => {
     return () => clearTimeout(timer);
   }, [timeRemaining, timerActive]);
 
+  // Helper function to calculate reward points based on percentage score.
+  // For example:
+  // 100% (6/6) => 50 points
+  // 83%-99% (5/6) => 40 points
+  // 67%-82% (4/6) => 30 points
+  // 50%-66% (3/6) => 20 points
+  // 33%-49% (2/6) => 10 points
+  // 17%-32% (1/6) => 5 points
+  // 0%-16% (0/6) => 0 points
+  const getRewardPoints = (score, total) => {
+    if (score === total) return 50;
+    if (score >= total * 0.83) return 40;
+    if (score >= total * 0.67) return 30;
+    if (score >= total * 0.5) return 20;
+    if (score >= total * 0.33) return 10;
+    if (score >= total * 0.17) return 5;
+    return 0;
+  };
+
   const fetchQuestionsFromGemini = async (module) => {
     setLoading(true);
     setError('');
     
     try {
       // Include difficulty in the prompt
-      const prompt = `Generate 5 multiple-choice questions about ${module} at ${difficulty} difficulty. 
+      const prompt = `Generate 6 multiple-choice questions about ${module} at ${difficulty} difficulty. 
 Each question should have 4 options with exactly one correct answer. 
 Format the response as a JSON array of objects with the following structure:
 [
@@ -109,10 +130,13 @@ Format the response as a JSON array of objects with the following structure:
       // Mark the selected module as active
       setModules(modules.map(m => ({ ...m, active: m.title === module })));
       setShowModuleInput(false);
+      // Reset score and quiz completion status
+      setScore(0);
+      setQuizCompleted(false);
     } catch (err) {
       console.error('Error fetching questions:', err);
       
-      // Fallback questions if API call fails
+      // Fallback questions (6 questions)
       const fallbackQuestions = [
         {
           id: 1,
@@ -146,6 +170,39 @@ Format the response as a JSON array of objects with the following structure:
             'Person D'
           ],
           correctAnswer: 'Person B'
+        },
+        {
+          id: 4,
+          question: `How does ${module} impact modern technology?`,
+          options: [
+            'It has minimal impact',
+            'It revolutionizes connectivity',
+            'It is only theoretical',
+            'It replaces all other technologies'
+          ],
+          correctAnswer: 'It revolutionizes connectivity'
+        },
+        {
+          id: 5,
+          question: `What is a common challenge in ${module}?`,
+          options: [
+            'Scalability issues',
+            'Excessive funding',
+            'Overregulation',
+            'Lack of interest'
+          ],
+          correctAnswer: 'Scalability issues'
+        },
+        {
+          id: 6,
+          question: `Which tool is frequently used in ${module}?`,
+          options: [
+            'Tool X',
+            'Tool Y',
+            'Tool Z',
+            'Tool W'
+          ],
+          correctAnswer: 'Tool X'
         }
       ];
       
@@ -155,6 +212,9 @@ Format the response as a JSON array of objects with the following structure:
       setTimerActive(true);
       setModules(modules.map(m => ({ ...m, active: m.title === module })));
       setShowModuleInput(false);
+      // Reset score and quiz completion status
+      setScore(0);
+      setQuizCompleted(false);
     } finally {
       setLoading(false);
     }
@@ -183,7 +243,11 @@ Format the response as a JSON array of objects with the following structure:
   const handleAnswerSubmit = () => {
     if (selectedAnswer) {
       const currentQuestion = questions[currentQuestionIndex];
-      setIsCorrect(selectedAnswer === currentQuestion.correctAnswer);
+      const correct = selectedAnswer === currentQuestion.correctAnswer;
+      setIsCorrect(correct);
+      if (correct) {
+        setScore(prevScore => prevScore + 1);
+      }
       setAnswerSubmitted(true);
       setTimerActive(false);
     }
@@ -197,8 +261,7 @@ Format the response as a JSON array of objects with the following structure:
       setTimeRemaining(30);
       setTimerActive(true);
     } else {
-      alert('Quiz completed!');
-      setShowModuleInput(true);
+      setQuizCompleted(true);
       setTimerActive(false);
     }
   };
@@ -207,7 +270,14 @@ Format the response as a JSON array of objects with the following structure:
     setShowModuleInput(true);
     setQuestions([]);
     setTimerActive(false);
+    setScore(0);
+    setQuizCompleted(false);
+    setCurrentQuestionIndex(0);
   };
+
+  // Calculate the percentage score and reward points
+  const percentageScore = Math.round((score / questions.length) * 100);
+  const rewardPoints = getRewardPoints(score, questions.length);
 
   return (
     <div className="min-h-screen mt-24 bg-gray-50 py-14 flex flex-col md:flex-row">
@@ -276,44 +346,6 @@ Format the response as a JSON array of objects with the following structure:
 
       {/* Main Content */}
       <main className="flex-1 bg-orange-50 p-6">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              {showModuleInput ? "Add New Module" : `Module: ${moduleName}`}
-            </h1>
-            <p className="text-sm text-gray-600">
-              {showModuleInput 
-                ? "Enter a new module name and select difficulty to generate questions" 
-                : "Answer all questions to complete the quiz"}
-            </p>
-          </div>
-          {!showModuleInput && (
-            <div className="text-sm text-gray-500 flex items-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-5 h-5 mr-1"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              {timerActive ? (
-                <span className={`font-medium ${timeRemaining < 10 ? 'text-red-500' : ''}`}>
-                  {timeRemaining} seconds remaining
-                </span>
-              ) : (
-                <span>Time: 30 seconds per question</span>
-              )}
-            </div>
-          )}
-        </div>
-
         {showModuleInput ? (
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-lg font-bold text-gray-800 mb-4">
@@ -358,6 +390,44 @@ Format the response as a JSON array of objects with the following structure:
               {error && <p className="mt-2 text-red-600">{error}</p>}
             </form>
           </div>
+        ) : quizCompleted ? (
+          <div className="bg-white p-8 rounded-lg shadow-md text-center">
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">Quiz Completed!</h2>
+            <div className="mb-6">
+              <p className="text-xl text-gray-700">
+                Your score: <span className="font-bold">{score}</span> out of <span className="font-bold">{questions.length}</span>
+              </p>
+              <p className="text-xl text-gray-700">
+                Percentage: <span className="font-bold">{percentageScore}%</span>
+              </p>
+              <p className="text-xl text-gray-700">
+                Reward Points Earned: <span className="font-bold">{rewardPoints}</span>
+              </p>
+            </div>
+            <div className="mb-6">
+              <div className="relative h-4 w-full bg-gray-200 rounded-full">
+                <div style={{ width: `${(score / questions.length) * 100}%` }} className="absolute h-4 bg-green-500 rounded-full"></div>
+              </div>
+            </div>
+            <div className="text-left mb-6">
+              <h3 className="font-semibold text-gray-800 mb-2">Reward Points Mapping:</h3>
+              <ul className="list-disc ml-6 text-gray-700">
+                <li>6/6 correct (100%): 50 points</li>
+                <li>5/6 correct (≈83%): 40 points</li>
+                <li>4/6 correct (≈67%): 30 points</li>
+                <li>3/6 correct (50%): 20 points</li>
+                <li>2/6 correct (≈33%): 10 points</li>
+                <li>1/6 correct (≈17%): 5 points</li>
+                <li>0/6 correct (0%): 0 points</li>
+              </ul>
+            </div>
+            <button
+              onClick={handleAddNewModule}
+              className="mt-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-md transition duration-200"
+            >
+              Return to Modules
+            </button>
+          </div>
         ) : (
           <>
             {currentQuestionIndex === 0 && (
@@ -384,7 +454,7 @@ Format the response as a JSON array of objects with the following structure:
                     <span className="font-medium">Results:</span>
                     <ul className="list-disc list-inside ml-4 space-y-1">
                       <li>You'll get immediate feedback on whether your answer is correct.</li>
-                      <li>After all questions are completed, you can choose another module or add a new one.</li>
+                      <li>After all questions are completed, your final score, percentage, and reward points will be displayed.</li>
                     </ul>
                   </li>
                 </ul>
@@ -392,6 +462,35 @@ Format the response as a JSON array of objects with the following structure:
             )}
 
             <div className="bg-white p-4 rounded-lg shadow-md mb-6">
+              <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold text-gray-800">
+                  Module: {moduleName}
+                </h1>
+                <div className="text-sm text-gray-500 flex items-center">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="w-5 h-5 mr-1"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  {timerActive ? (
+                    <span className={`font-medium ${timeRemaining < 10 ? 'text-red-500' : ''}`}>
+                      {timeRemaining} seconds remaining
+                    </span>
+                  ) : (
+                    <span>Time: 30 seconds per question</span>
+                  )}
+                </div>
+              </div>
+
               <h3 className="text-lg font-bold text-gray-800 mb-2">
                 Question {currentQuestionIndex + 1} of {questions.length}: {questions[currentQuestionIndex]?.question}
               </h3>
