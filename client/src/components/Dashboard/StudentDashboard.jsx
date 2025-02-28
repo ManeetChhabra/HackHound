@@ -66,7 +66,6 @@ const StudentDashboard = () => {
   ];
 
   // Dummy Reward Transactions with adjusted values:
-  // Earned transactions are positive; Redeemed transactions are negative.
   const rewardTransactions = [
     { id: 1, type: 'Earned', description: 'Completed Introduction to AI', date: '28 January 2021', points: 50 },
     { id: 2, type: 'Earned', description: 'Submitted assignment in Web Development', date: '25 January 2021', points: 20 },
@@ -92,6 +91,15 @@ const StudentDashboard = () => {
   const filteredTransactions = rewardTransactions.filter(tx =>
     filter === 'All' ? true : tx.type === filter
   );
+
+  // Skills data for tracking in the Academic Summary Card
+  const skillsData = [
+    { name: 'Python', level: 85 },
+    { name: 'React', level: 75 },
+    { name: 'Machine Learning', level: 65 },
+    { name: 'Data Structures', level: 80 },
+    { name: 'Web Dev', level: 70 },
+  ];
 
   return (
     <motion.div
@@ -154,13 +162,12 @@ const StudentDashboard = () => {
             <p className="mt-2 text-gray-600">
               Total Reward Points: <span className="font-semibold text-green-600">{currentBalance}</span>
             </p>
-            {/* For clarity, showing breakdown: Earned = {totalEarned} and Redeemed = {totalRedeemed} */}
           </div>
         </div>
 
         {/* Academic Summary & Course Progress */}
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Academic Summary Card */}
+          {/* Academic Summary Card with Skills Tracking */}
           <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-8 rounded-xl shadow-lg text-white">
             <div className="flex justify-between items-center">
               <div>
@@ -180,9 +187,27 @@ const StudentDashboard = () => {
                 <p className="text-xl">90</p>
               </div>
             </div>
+            {/* New Skills Tracking Section */}
+            <div className="mt-8">
+              <h3 className="text-2xl font-bold">Skill Progress</h3>
+              <div className="mt-4 space-y-3">
+                {skillsData.map((skill, index) => (
+                  <div key={index} className="flex items-center">
+                    <span className="w-24 text-sm">{skill.name}</span>
+                    <div className="flex-1 mx-3 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        style={{ width: `${skill.level}%` }}
+                        className="h-full rounded-full bg-green-400"
+                      ></div>
+                    </div>
+                    <span className="w-12 text-sm">{skill.level}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Course Progress Pie Chart */}
+          {/* Course Progress Pie Chart Card */}
           <div className="bg-white p-8 rounded-xl shadow-lg">
             <h3 className="text-2xl font-semibold text-gray-800 mb-6">Course Progress</h3>
             <div className="flex justify-center items-center">
